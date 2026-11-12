@@ -239,54 +239,61 @@ async def ask_gemini_direct(question: str, clan_context: str) -> str:
 @bot.event
 async def on_ready():
     bot.add_view(StrategyVoteView())
+    bot.add_view(LaunchPanelView())
+    print(f"🚀 БОТ-КУРИЕР Е ОНЛАЙН: {bot.user.name}")
 
-bot.add_view(LaunchPanelView())
-print(f"🚀 БОТ-КУРИЕР Е ОНЛАЙН: {bot.user.name}")
 @bot.event
 async def on_message(message):
-if message.author == bot.user:
-return
-if message.content == "?преглед_стратегия":
-f1_text, f2_text = await asyncio.to_thread(sync_get_strategy_texts)
-embed = discord.Embed(title="⚔️ СТРАТЕГИЧЕСКА КАРТА ЗА CvC ⚔️", color=discord.Color.gold())
-embed.add_field(name="📅 Сценарий и Времеви хоризонт", value=f1_text, inline=False)
-embed.add_field(name="💶 Действия и Бизнес ROI Анализ", value=f2_text, inline=False)
-await message.channel.send(embed=embed, view=StrategyVoteView())
-return
-if message.content == "?панел_прогнози":
-await message.channel.send(
-"🔮 КОНТРОЛЕН ПАНЕЛ ЗА ПРОГНОЗИРАНЕ\n"
-"Въведете наличностите си, за да изчислим стартовия ви потенциал и да получите AI анализ:",
-view=LaunchPanelView()
-)
-return
-if message.content.startswith("?питай_стратег"):
-question = message.content[len("?питай_стратег"):].strip()
-if not question:
-await message.channel.send("❓ Напиши въпроса си след командата. Пример: ?питай_стратег Колко точки дават 1000 магма тухлички при 2x?")
-return
-async with message.channel.typing():
-try:
-clan_context = await asyncio.to_thread(sync_get_clan_context)
-answer = await ask_gemini_direct(question, clan_context)
-# Записваме историята във фонов режим, без да бавим отговора към играча
-asyncio.create_task(asyncio.to_thread(sync_log_history, str(message.author.name), question, answer))
-await message.reply(f"🧠 AI Стратег:\n{answer}")
-except Exception as e:
-await message.reply(f"❌ Възникна грешка при обработката: {e}")
-return
-await bot.process_commands(message)
+    if message.author == bot.user:
+        return
+
+    if message.content == "?преглед_стратегия":
+        f1_text, f2_text = await asyncio.to_thread(sync_get_strategy_texts)
+        embed = discord.Embed(title="⚔️ СТРАТЕГИЧЕСКА КАРТА ЗА CvC ⚔️", color=discord.Color.gold())
+        embed.add_field(name="📅 Сценарий и Времеви хоризонт", value=f1_text, inline=False)
+        embed.add_field(name="💶 Действия и Бизнес ROI Анализ", value=f2_text, inline=False)
+        await message.channel.send(embed=embed, view=StrategyVoteView())
+        return
+
+    if message.content == "?панел_прогнози":
+        await message.channel.send(
+            "🔮 КОНТРОЛЕН ПАНЕЛ ЗА ПРОГНОЗИРАНЕ\n"
+            "Въведете наличностите си, за да изчислим стартовия ви потенциал и да получите AI анализ:",
+            view=LaunchPanelView()
+        )
+        return
+
+    if message.content.startswith("?питай_стратег"):
+        question = message.content[len("?питай_стратег"):].strip()
+        if not question:
+            await message.channel.send("❓ Напиши въпроса си след командата. Пример: ?питай_стратег Колко точки дават 1000 магма тухлички при 2x?")
+            return
+        
+        async with message.channel.typing():
+            try:
+                clan_context = await asyncio.to_thread(sync_get_clan_context)
+                answer = await ask_gemini_direct(question, clan_context)
+                # Записваме историята във фонов режим, без да бавим отговора към играча
+                asyncio.create_task(asyncio.to_thread(sync_log_history, str(message.author.name), question, answer))
+                await message.reply(f"🧠 AI Стратег:\n{answer}")
+            except Exception as e:
+                await message.reply(f"❌ Възникна грешка при обработката: {e}")
+        return
+
+    await bot.process_commands(message)
+
 async def main():
-global http_session
-http_session = aiohttp.ClientSession()
-try:
-app = web.Application()
-app.router.add_get('/', lambda r: web.Response(text="Ботът работи!"))
-runner = web.AppRunner(app)
-await runner.setup()
-await web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 10000))).start()
-await bot.start(os.environ.get("DISCORD_TOKEN"))
-finally:
-await http_session.close()
-if name == "main":
-asyncio.run(main())
+    global http_session
+    http_session = aiohttp.ClientSession()
+    try:
+        app = web.Application()
+        app.router.add_get('/', lambda r: web.Response(text="Ботът работи!"))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 10000))).start()
+        await bot.start(os.environ.get("DISCORD_TOKEN"))
+    finally:
+        await http_session.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
